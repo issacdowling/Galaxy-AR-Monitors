@@ -1,53 +1,79 @@
+#include <cstdio>
 #include <fstream>
-#include <opencv4/opencv2/videoio.hpp>
 #include <stdio.h>
-#include "raylib.h"
-#include "rlgl.h"
-#include "rcamera.h"
+#include <sys/poll.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/signalfd.h>
+
+#define PixelFormat RaylibPixelFormat
+#include "raylib.h"
+#undef PixelFormat
+#include "rlgl.h"
+#include "rcamera.h"
+
+#include "include/libscreencapture-wayland/PortalModule/xdg-desktop-portal.hpp"
+#include "include/libscreencapture-wayland/common.hpp"
+#include "include/libscreencapture-wayland/PipeWireModule/PipeWireStream.hpp"
 
 // Extra thanks to:
-// danimartin82 for their test2_camera.cpp example (https://github.com/danimartin82/opencv_raylib/tree/master), teaching me how to turn OpenCV frames into textures
+// danimartin82 for their test2_camera.cpp example (https://github.com/danimartin82/opencv_raylib/tree/master), teaching me how to turn OpenCV frames into textures, though I have replaced OpenCV now
 // Raylib DrawCubeTexture example for helping me make the display (https://www.raylib.com/examples/models/loader.html?name=models_draw_cube_texture)
 
 std::string imufilepath = "/dev/shm/galaxy/glass_imu.csv";
 std::string fovfilepath = "/dev/shm/galaxy/vfov";
 
-cv::Mat frame;
-cv::VideoCapture cap;
+Texture2D texture;
 
+// From the libscreencapture-wayland example, apparently just necessary
+template<class... Ts>
+struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
 bool thread_running = true;
-
-pthread_mutex_t videomutex;
-
+void* frame;
 void* videoCapThread(void *id){
-		cap.open("shmsrc socket-path=/dev/shm/galaxy/centremonitor ! video/x-raw, format=RGBA, width=1920, height=1080, framerate=120/1 ! appsink");
+	std::optional<portal::SharedScreen> shareInfo = portal::requestPipeWireShare(CURSOR_MODE_EMBED);
 
-    while(thread_running) {
-				if (cap.grab()) {
-					pthread_mutex_lock(&videomutex);
-					cap.retrieve(frame);
-					pthread_mutex_unlock(&videomutex);			
-					
-				}
-    }
-		cap.release();
-		return NULL;
+	// TODO: Either work on DMA buf, or figure out that it's not worth it
+	auto pwStream = pw::PipeWireStream(shareInfo.value(), false);
 
+	bool shouldStop = false;
+	while (!shouldStop) {
+		struct pollfd fds[2];
+		fds[0] = {pwStream.getEventPollFd(), POLLIN, 0};
+		int res = poll(fds, 2, -1);
+		if (!(fds[0].revents & POLLIN))
+			continue;
+		auto ev = pwStream.nextEvent();
+		if (ev) {
+			// call lambda function appropriate for the type of *ev
+			std::visit(overloaded{
+					[&] (pw::event::Connected& e) {
+
+					},
+					[&] (pw::event::Disconnected&) {
+						shouldStop = true;
+					},
+					[&] (pw::event::MemoryFrameReceived& e) {
+						printf("Frame received");
+						frame = (void*) (e.frame->memory);
+						// shouldStop = true;
+					},
+					[&] (pw::event::DmaBufFrameReceived& e) {
+					}
+			}, *ev);
+		}
+	}
+
+	return NULL;
 }
 
 void DrawPlaneTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color); // Draw cube textured
 
 int main(int argc, char** argv)
 {
-	pthread_t ptid;
-	pthread_mutex_init(&videomutex,NULL);  
-  pthread_create(&ptid, NULL, videoCapThread, NULL);
-
-	// Just keep temporarily until better solution for waiting for capture happens
-	usleep(100000);
-
+	//// Window setup
 	int windowWidth = 1920;
 	int windowHeight = 1080;
 
@@ -62,46 +88,60 @@ int main(int argc, char** argv)
 	camera.fovy = 45.0f;
 	camera.projection = CAMERA_PERSPECTIVE;
 
+
+	//// Screencap setup (MUST!! COME AFTER THE InitWindow, or texure loading will segfault)
+	screencapture_wayland_init(&argc, &argv);
+
+	pthread_t ptid;
+  pthread_create(&ptid, NULL, videoCapThread, NULL);
+
+	// Just keep temporarily until better solution for waiting for capture happens
+	usleep(3000000);
+
 	// I am not sure why it's necessary to load this initially for an image, but setting the properties of a texture
 	// directly, then updating as will be done later doesn't work.
 	Image initial_display_texture;
-	pthread_mutex_lock(&videomutex);
-	initial_display_texture.width = frame.cols;
-	initial_display_texture.height = frame.rows;
+	initial_display_texture.width = 1920;
+	initial_display_texture.height = 1080;
 	initial_display_texture.format = 7;
 	initial_display_texture.mipmaps= 1 ;
-	initial_display_texture.data= (void*)(frame.data);
-	pthread_mutex_unlock(&videomutex);
+	initial_display_texture.data = (void*) (frame);
 
-	Texture2D texture = LoadTextureFromImage(initial_display_texture);
+	texture = LoadTextureFromImage(initial_display_texture);
+
+	// Makes screen look MUCH MUCH MUCH better off-axis
+	SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
+
+
+	//// Init some variables used later
+
+	std::string imustring;
+	std::string rollString;
+	std::string pitchString;
+	std::string yawString;
 
 	float roll;
 	float pitch;
 	float yaw;
-	
-	// Makes screen look MUCH MUCH MUCH better off-axis
-	SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
-
-	std::string imustring;
 
 	while (!WindowShouldClose()) 
 	{
 
-		UpdateTexture(texture, (void*)(frame.data));
+		UpdateTexture(texture, (void*)(frame));
 
 		// Read and apply IMU file/values at the beginning of each frame
 		std::ifstream imufile(imufilepath);
 		std::getline(imufile, imustring);
 
-		std::string rollString = imustring.substr(0, imustring.find(","));
+		rollString = imustring.substr(0, imustring.find(","));
 		float roll = strtof(rollString.c_str(), NULL);
 		imustring.erase(0, imustring.find(",") + 1);
 		
-		std::string pitchString = imustring.substr(0, imustring.find(","));
+		pitchString = imustring.substr(0, imustring.find(","));
 		float pitch = strtof(pitchString.c_str(), NULL);
 		imustring.erase(0, imustring.find(",") + 1);
 
-		std::string yawString = imustring.substr(0, imustring.find(","));
+		yawString = imustring.substr(0, imustring.find(","));
 		float yaw = strtof(yawString.c_str(), NULL);
 
 		// Apply roll pitch and yaw turned into radians. These ADD the rotation to the camera, rather
@@ -129,30 +169,25 @@ int main(int argc, char** argv)
 
 		// Reload the video capture thread
 		if(IsKeyDown(KEY_Q)) {
-			printf("Exiitng Video Capture Thread...");
+			printf("Exiting Video Capture Thread...");
 			thread_running = false;
-		}
-
-		// Reload the video capture thread
-		if(IsKeyPressed(KEY_E)) {
+			usleep(1000000);
 			printf("Starting Video Capture Thread...");
 			thread_running = true;
-		  pthread_create(&ptid, NULL, videoCapThread, NULL);
+		  pthread_create(&ptid, NULL, videoCapThread, NULL);			
 		}
 
 		// Reload FOV value
 		if(IsKeyDown(KEY_C)) {
-		std::string vfovstring;
-		std::ifstream vfovfile(fovfilepath);
-		std::getline(vfovfile, vfovstring);
-		float vfov = strtof(vfovstring.c_str(), NULL);
-		printf("Vertical FOV set to %f", vfov);
-		camera.fovy = vfov;
-
+			std::string vfovstring;
+			std::ifstream vfovfile(fovfilepath);
+			std::getline(vfovfile, vfovstring);
+			float vfov = strtof(vfovstring.c_str(), NULL);
+			printf("Vertical FOV set to %f", vfov);
+			camera.fovy = vfov;
 		}
 
 		printf("FPS: %i\n",GetFPS());
-	
 	}
 
     UnloadTexture(texture);
@@ -162,10 +197,8 @@ int main(int argc, char** argv)
 		exit(0);
 }
 
-
 // Originally was DrawCubeTexture from https://www.raylib.com/examples/models/loader.html?name=models_draw_cube_texture but will be DrawPlaneTexture
-void DrawPlaneTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color)
-{
+void DrawPlaneTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color) {
     float x = position.x;
     float y = position.y;
     float z = position.z;
