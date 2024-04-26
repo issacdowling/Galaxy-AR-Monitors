@@ -69,30 +69,3 @@ if (ENABLE_PIPEWIRE_MODULE)
     target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-pipewire)
     target_compile_definitions(screencapture-wayland PRIVATE "HAVE_PIPEWIRE_MODLE")
 endif()
-
-
-if (ENABLE_FFMPEG_MODULE)
-    add_subdirectory(FFMPEGModule)
-    target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-ffmpeg)
-    target_compile_definitions(screencapture-wayland PRIVATE "HAVE_FFMPEG_MODLE")
-endif()
-
-if (ENABLE_GSTREAMER_MODULE)
-    add_subdirectory(GStreamerModule)
-    target_link_libraries(screencapture-wayland ${MODULE_SCOPE} screencapture-module-gst)
-    target_compile_definitions(screencapture-wayland PRIVATE "HAVE_GSTREAMER_MODULE")
-endif()
-
-
-######################################
-# main binary
-######################################
-
-add_executable(screencapture main.cpp)
-target_link_libraries(screencapture PRIVATE screencapture-wayland)
-
-# enable Full RELRO
-target_link_options(screencapture PRIVATE -Wl,-z,now -Wl,-gc-sections -Wl,-as-needed)
-if(${STATIC_LIBSTDC++})
-    target_link_options(screencapture PRIVATE -static-libstdc++)
-endif()
