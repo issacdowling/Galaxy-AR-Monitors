@@ -1,3 +1,0 @@
-[submodule "src/arenv/include/libscreencapture-wayland"]
-	path = src/arenv/include/libscreencapture-wayland
-	url = https://github.com/DafabHoid/libscreencapture-wayland
