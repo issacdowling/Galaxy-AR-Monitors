@@ -9,7 +9,7 @@ target_link_libraries(galaxy PRIVATE
 )
 
 # libscreencapture-wayland additions. To prevent Doxygen errors, install (Arch: doxygen graphviz)
-set(BUILD_SHARED_LIBS ON)
+set(BUILD_SHARED_LIBS OFF)
 set(ENABLE_PORTAL_MODULE ON)
 set(ENABLE_PIPEWIRE_MODULE ON)
 set(ENABLE_FFMPEG_MODULE OFF)
