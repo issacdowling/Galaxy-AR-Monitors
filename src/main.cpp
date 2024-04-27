@@ -69,7 +69,7 @@ void* videoCapThread(void *id){
 	return NULL;
 }
 
-void DrawPlaneTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color); // Draw cube textured
+void DrawPlaneTexture(Texture2D texture, Vector3 position, float width, float height, float length); // Draw cube textured
 
 int main(int argc, char** argv)
 {
@@ -79,6 +79,7 @@ int main(int argc, char** argv)
 
 	InitWindow(windowWidth, windowHeight, "Galaxy");
 
+	// TODO, try using VSYNC instead for supposed performance improvements
 	SetTargetFPS(120);
 
 	Camera camera = { 0 };
@@ -96,14 +97,14 @@ int main(int argc, char** argv)
   pthread_create(&ptid, NULL, videoCapThread, NULL);
 
 	// Just keep temporarily until better solution for waiting for capture happens
-	usleep(3000000);
+	usleep(1500000);
 
 	// I am not sure why it's necessary to load this initially for an image, but setting the properties of a texture
 	// directly, then updating as will be done later doesn't work.
 	Image initial_display_texture;
 	initial_display_texture.width = 1920;
 	initial_display_texture.height = 1080;
-	initial_display_texture.format = 7;
+	initial_display_texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 	initial_display_texture.mipmaps= 1 ;
 	initial_display_texture.data = (void*) (frame);
 
@@ -156,7 +157,7 @@ int main(int argc, char** argv)
 
 				ClearBackground(BLACK);
 				
-				DrawPlaneTexture(texture, (Vector3){0.0f, 0.0f, 4.0f}, -5.33333f, -3.0f, 0.0f, WHITE);
+				DrawPlaneTexture(texture, (Vector3){0.0f, 0.0f, 4.0f}, -5.33333f, -3.0f, 0.0f);
 
 			EndMode3D();
 		EndDrawing();
@@ -198,7 +199,7 @@ int main(int argc, char** argv)
 }
 
 // Originally was DrawCubeTexture from https://www.raylib.com/examples/models/loader.html?name=models_draw_cube_texture but will be DrawPlaneTexture
-void DrawPlaneTexture(Texture2D texture, Vector3 position, float width, float height, float length, Color color) {
+void DrawPlaneTexture(Texture2D texture, Vector3 position, float width, float height, float length) {
     float x = position.x;
     float y = position.y;
     float z = position.z;
@@ -206,17 +207,19 @@ void DrawPlaneTexture(Texture2D texture, Vector3 position, float width, float he
     // Set desired texture to be enabled while drawing following vertex data
     rlSetTexture(texture.id);
 
-        rlBegin(RL_QUADS);
-            rlColor4ub(color.r, color.g, color.b, color.a);
+			rlBegin(RL_QUADS);
 
-            // Only face
-            rlNormal3f(0.0f, 0.0f, 0.0f);
-            rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z - length/2);  // Bottom Right Of The Texture and Quad
-            rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z - length/2);  // Top Right Of The Texture and Quad
-            rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z - length/2);  // Top Left Of The Texture and Quad
-            rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z - length/2);  // Bottom Left Of The Texture and Quad
+				// White background before texture applied
+				rlColor4ub(255,255,255,255);
 
-        rlEnd();
+				// Only face
+				rlNormal3f(0.0f, 0.0f, 0.0f);
+				rlTexCoord2f(0.0f, 0.0f); rlVertex3f(x - width/2, y - height/2, z - length/2);  // Bottom Right Of The Texture and Quad
+				rlTexCoord2f(0.0f, 1.0f); rlVertex3f(x - width/2, y + height/2, z - length/2);  // Top Right Of The Texture and Quad
+				rlTexCoord2f(1.0f, 1.0f); rlVertex3f(x + width/2, y + height/2, z - length/2);  // Top Left Of The Texture and Quad
+				rlTexCoord2f(1.0f, 0.0f); rlVertex3f(x + width/2, y - height/2, z - length/2);  // Bottom Left Of The Texture and Quad
+
+			rlEnd();
 
     rlSetTexture(0);
 }
