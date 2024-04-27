@@ -1,8 +1,0 @@
-Building:
-  $ mkdir build
-  $ cd build
-  $ cmake .. -DCMAKE_BUILD_TYPE=Release ${OTHER_CONFIG_FLAGS}
-  $ make
-
-Installing:
-  $ sudo make install
