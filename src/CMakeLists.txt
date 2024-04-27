@@ -6,6 +6,8 @@ add_executable(galaxy main.cpp)
 
 target_link_libraries(galaxy PRIVATE
  raylib
+ opencv_imgproc
+ opencv_core
 )
 
 # libscreencapture-wayland additions. To prevent Doxygen errors, install (Arch: doxygen graphviz)

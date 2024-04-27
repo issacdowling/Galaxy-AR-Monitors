@@ -12,6 +12,8 @@
 #include "rlgl.h"
 #include "rcamera.h"
 
+#include "opencv2/imgproc.hpp"
+
 #include "include/libscreencapture-wayland/PortalModule/xdg-desktop-portal.hpp"
 #include "include/libscreencapture-wayland/common.hpp"
 #include "include/libscreencapture-wayland/PipeWireModule/PipeWireStream.hpp"
@@ -25,40 +27,43 @@ std::string fovfilepath = "/dev/shm/galaxy/vfov";
 
 Texture2D texture;
 
+cv::Mat screencapMat(1080, 1920, CV_8UC4);
+
 // From the libscreencapture-wayland example, apparently just necessary
 template<class... Ts>
 struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
+
 bool thread_running = true;
-void* frame;
 void* videoCapThread(void *id){
 	std::optional<portal::SharedScreen> shareInfo = portal::requestPipeWireShare(CURSOR_MODE_EMBED);
 
 	// TODO: Either work on DMA buf, or figure out that it's not worth it
 	auto pwStream = pw::PipeWireStream(shareInfo.value(), false);
 
-	bool shouldStop = false;
-	while (!shouldStop) {
-		struct pollfd fds[2];
-		fds[0] = {pwStream.getEventPollFd(), POLLIN, 0};
-		int res = poll(fds, 2, -1);
-		if (!(fds[0].revents & POLLIN))
-			continue;
+	while (thread_running) {
 		auto ev = pwStream.nextEvent();
 		if (ev) {
 			// call lambda function appropriate for the type of *ev
 			std::visit(overloaded{
 					[&] (pw::event::Connected& e) {
-
+						printf("Connected to Pipewire capture\n");
 					},
 					[&] (pw::event::Disconnected&) {
-						shouldStop = true;
+						printf("Disconnected from Pipewire capture\n");
+						thread_running = false;
 					},
 					[&] (pw::event::MemoryFrameReceived& e) {
-						printf("Frame received");
-						frame = (void*) (e.frame->memory);
-						// shouldStop = true;
+						// The Pipewire input is BGRX (which we will treat as BGRA), so we convert it to RGB (as we do not need this useless Alpha channel)
+						// This is done by passing a Mat which specifies the height, width, type, and pixel data of the frame, and
+						// setting the output to a previously created empty Mat.
+						// The awkward part of this solution for me was the type. I was getting corrupted outputs / segfaults,
+						// and it seems to have been a combination of not remembering to add an Alpha channel at the start of the conversion type,
+						// and - the main reason - not understanding the Mat types. CV_8U is not enough, as it specifies 8 bit per channel, but
+						// assumes 3 channels, and I need 4 to take BGRA in. CV_8UC4 therefore works.
+						cv::cvtColor(cv::Mat(1080, 1920, CV_8UC4, (void*) (e.frame->memory)), screencapMat, cv::COLOR_RGBA2BGR);
+
 					},
 					[&] (pw::event::DmaBufFrameReceived& e) {
 					}
@@ -104,15 +109,14 @@ int main(int argc, char** argv)
 	Image initial_display_texture;
 	initial_display_texture.width = 1920;
 	initial_display_texture.height = 1080;
-	initial_display_texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+	initial_display_texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8;
 	initial_display_texture.mipmaps= 1 ;
-	initial_display_texture.data = (void*) (frame);
+	initial_display_texture.data = (void*) (screencapMat.data);
 
 	texture = LoadTextureFromImage(initial_display_texture);
 
 	// Makes screen look MUCH MUCH MUCH better off-axis
 	SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
-
 
 	//// Init some variables used later
 
@@ -128,7 +132,7 @@ int main(int argc, char** argv)
 	while (!WindowShouldClose()) 
 	{
 
-		UpdateTexture(texture, (void*)(frame));
+		UpdateTexture(texture, (void*)(screencapMat.data));
 
 		// Read and apply IMU file/values at the beginning of each frame
 		std::ifstream imufile(imufilepath);
