@@ -27,7 +27,11 @@ std::string fovfilepath = "/dev/shm/galaxy/vfov";
 
 Texture2D texture;
 
-cv::Mat screencapMat(1080, 1920, CV_8UC4);
+cv::Mat screencapMat;
+int screencapHeight;
+int screencapWidth;
+
+bool cap_thread_ready = false;
 
 // From the libscreencapture-wayland example, apparently just necessary
 template<class... Ts>
@@ -37,6 +41,7 @@ overloaded(Ts...) -> overloaded<Ts...>;
 
 bool thread_running = true;
 void* videoCapThread(void *id){
+	thread_running = true;
 	std::optional<portal::SharedScreen> shareInfo = portal::requestPipeWireShare(CURSOR_MODE_EMBED);
 
 	// TODO: Either work on DMA buf, or figure out that it's not worth it
@@ -52,17 +57,22 @@ void* videoCapThread(void *id){
 					},
 					[&] (pw::event::Disconnected&) {
 						printf("Disconnected from Pipewire capture\n");
+						cap_thread_ready = false;
 						thread_running = false;
 					},
 					[&] (pw::event::MemoryFrameReceived& e) {
 						// The Pipewire input is BGRX (which we will treat as BGRA), so we convert it to RGB (as we do not need this useless Alpha channel)
-						// This is done by passing a Mat which specifies the height, width, type, and pixel data of the frame, and
+						// This is done by passing a Mat which specifies the height / width (using that of the current frame), type, and pixel data of the frame, and
 						// setting the output to a previously created empty Mat.
 						// The awkward part of this solution for me was the type. I was getting corrupted outputs / segfaults,
 						// and it seems to have been a combination of not remembering to add an Alpha channel at the start of the conversion type,
 						// and - the main reason - not understanding the Mat types. CV_8U is not enough, as it specifies 8 bit per channel, but
 						// assumes 3 channels, and I need 4 to take BGRA in. CV_8UC4 therefore works.
-						cv::cvtColor(cv::Mat(1080, 1920, CV_8UC4, (void*) (e.frame->memory)), screencapMat, cv::COLOR_RGBA2BGR);
+						screencapHeight = e.frame->height;
+						screencapWidth = e.frame->width;
+						cv::cvtColor(cv::Mat(screencapHeight, screencapWidth, CV_8UC4, (void*) (e.frame->memory)), screencapMat, cv::COLOR_RGBA2BGR);
+
+						cap_thread_ready = true;
 
 					},
 					[&] (pw::event::DmaBufFrameReceived& e) {
@@ -70,7 +80,7 @@ void* videoCapThread(void *id){
 			}, *ev);
 		}
 	}
-
+	cap_thread_ready = false;
 	return NULL;
 }
 
@@ -95,20 +105,20 @@ int main(int argc, char** argv)
 	camera.projection = CAMERA_PERSPECTIVE;
 
 
-	//// Screencap setup (MUST!! COME AFTER THE InitWindow, or texure loading will segfault)
+	//// Screencap setup (!!MUST!! COME AFTER THE InitWindow, or texure loading will segfault)
 	screencapture_wayland_init(&argc, &argv);
 
 	pthread_t ptid;
   pthread_create(&ptid, NULL, videoCapThread, NULL);
 
-	// Just keep temporarily until better solution for waiting for capture happens
-	usleep(1500000);
+	// Wait until the capture thread has at least received one frame before continuing
+	while (!cap_thread_ready) usleep(200000);
 
 	// I am not sure why it's necessary to load this initially for an image, but setting the properties of a texture
 	// directly, then updating as will be done later doesn't work.
 	Image initial_display_texture;
-	initial_display_texture.width = 1920;
-	initial_display_texture.height = 1080;
+	initial_display_texture.width = screencapWidth;
+	initial_display_texture.height = screencapHeight;
 	initial_display_texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8;
 	initial_display_texture.mipmaps= 1 ;
 	initial_display_texture.data = (void*) (screencapMat.data);
@@ -176,10 +186,19 @@ int main(int argc, char** argv)
 		if(IsKeyDown(KEY_Q)) {
 			printf("Exiting Video Capture Thread...");
 			thread_running = false;
-			usleep(1000000);
 			printf("Starting Video Capture Thread...");
-			thread_running = true;
-		  pthread_create(&ptid, NULL, videoCapThread, NULL);			
+		  pthread_create(&ptid, NULL, videoCapThread, NULL);
+			while (!cap_thread_ready) usleep(200000);
+
+			// Re-init the texture with the potentially new resolution
+			Image initial_display_texture;
+			initial_display_texture.width = screencapWidth;
+			initial_display_texture.height = screencapHeight;
+			initial_display_texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8;
+			initial_display_texture.mipmaps= 1 ;
+			initial_display_texture.data = (void*) (screencapMat.data);
+
+			texture = LoadTextureFromImage(initial_display_texture);			
 		}
 
 		// Reload FOV value
