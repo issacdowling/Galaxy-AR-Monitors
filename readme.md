@@ -1,4 +1,4 @@
-The only current dependencies should be libpipewire and raylib, though I want to statically compile things, and package as a Flatpak and Appimage to solve any portability issues.
+The only current dependencies should be libpipewire, opencv and raylib, though I want to statically compile things, and package as a Flatpak and Appimage to solve any portability issues.
 
 Clone this repo, then go into src/arenv, make and cd into build dir, and compile.
 
