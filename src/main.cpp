@@ -28,8 +28,8 @@ std::string fovfilepath = "/dev/shm/galaxy/vfov";
 Texture2D texture;
 
 cv::Mat screencapMat;
-int screencapHeight;
-int screencapWidth;
+int screencapHeight = 0;
+int screencapWidth = 0;
 
 bool cap_thread_ready = false;
 
@@ -53,7 +53,7 @@ void* videoCapThread(void *id){
 			// call lambda function appropriate for the type of *ev
 			std::visit(overloaded{
 					[&] (pw::event::Connected& e) {
-						printf("Connected to Pipewire capture\n");
+						printf("Connected to Pipewire capture\nWaiting for frame...");
 					},
 					[&] (pw::event::Disconnected&) {
 						printf("Disconnected from Pipewire capture\n");
@@ -68,8 +68,8 @@ void* videoCapThread(void *id){
 						// and it seems to have been a combination of not remembering to add an Alpha channel at the start of the conversion type,
 						// and - the main reason - not understanding the Mat types. CV_8U is not enough, as it specifies 8 bit per channel, but
 						// assumes 3 channels, and I need 4 to take BGRA in. CV_8UC4 therefore works.
-						screencapHeight = e.frame->height;
-						screencapWidth = e.frame->width;
+						if (screencapHeight != e.frame->height || screencapWidth != e.frame->width) screencapHeight = e.frame->height; screencapWidth = e.frame->width;
+
 						cv::cvtColor(cv::Mat(screencapHeight, screencapWidth, CV_8UC4, (void*) (e.frame->memory)), screencapMat, cv::COLOR_RGBA2BGR);
 
 						cap_thread_ready = true;
@@ -122,7 +122,6 @@ int main(int argc, char** argv)
 	initial_display_texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8;
 	initial_display_texture.mipmaps= 1 ;
 	initial_display_texture.data = (void*) (screencapMat.data);
-
 	texture = LoadTextureFromImage(initial_display_texture);
 
 	// Makes screen look MUCH MUCH MUCH better off-axis
