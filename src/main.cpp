@@ -22,7 +22,7 @@
 // danimartin82 for their test2_camera.cpp example (https://github.com/danimartin82/opencv_raylib/tree/master), teaching me how to turn OpenCV frames into textures, though I have replaced OpenCV now
 // Raylib DrawCubeTexture example for helping me make the display (https://www.raylib.com/examples/models/loader.html?name=models_draw_cube_texture)
 
-std::string imufilepath = "/dev/shm/galaxy/glass_imu.csv";
+std::string imufilepath = "/dev/shm/galaxy/glass_imu";
 std::string fovfilepath = "/dev/shm/galaxy/vfov";
 
 Texture2D texture;
@@ -53,7 +53,7 @@ void* videoCapThread(void *id){
 			// call lambda function appropriate for the type of *ev
 			std::visit(overloaded{
 					[&] (pw::event::Connected& e) {
-						printf("Connected to Pipewire capture\nWaiting for frame...");
+						printf("Connected to Pipewire capture, waiting for frame...\n");
 					},
 					[&] (pw::event::Disconnected&) {
 						printf("Disconnected from Pipewire capture\n");
@@ -101,7 +101,7 @@ int main(int argc, char** argv)
 	camera.position = (Vector3){ 0.0f, 0.0f, 0.0f };
 	camera.target = (Vector3){ 0.0f, 0.0f, 4.0f };
 	camera.up = (Vector3){ 0.0f, 0.01f, 0.0f };
-	camera.fovy = 45.0f;
+	camera.fovy = 22.5f;
 	camera.projection = CAMERA_PERSPECTIVE;
 
 
@@ -112,6 +112,7 @@ int main(int argc, char** argv)
   pthread_create(&ptid, NULL, videoCapThread, NULL);
 
 	// Wait until the capture thread has at least received one frame before continuing
+	printf("Started screencap thread, waiting for confirmation...\n");
 	while (!cap_thread_ready) usleep(200000);
 
 	// I am not sure why it's necessary to load this initially for an image, but setting the properties of a texture
@@ -127,6 +128,16 @@ int main(int argc, char** argv)
 	// Makes screen look MUCH MUCH MUCH better off-axis
 	SetTextureFilter(texture, TEXTURE_FILTER_TRILINEAR);
 
+	// Init the FOV
+	if (access(fovfilepath.c_str(), F_OK) == 0) {
+		std::string vfovstring;
+		std::ifstream vfovfile(fovfilepath);
+		std::getline(vfovfile, vfovstring);
+		float vfov = strtof(vfovstring.c_str(), NULL);
+		printf("FOV File found, vertical FOV set to %f\n", vfov);
+		camera.fovy = vfov;
+	} else printf("No FOV file found, using default vertical FOV of %f\n", camera.fovy);
+
 	//// Init some variables used later
 
 	std::string imustring;
@@ -134,9 +145,17 @@ int main(int argc, char** argv)
 	std::string pitchString;
 	std::string yawString;
 
-	float roll;
-	float pitch;
-	float yaw;
+	float roll = 0.0;
+	float pitch = 0.0;
+	float yaw = 0.0;
+
+	float calRoll = 0.0;
+	float calPitch = 0.0;
+	float calYaw = 0.0;
+
+	printf("==============\n");
+	printf("Galaxy AR Monitors has started.\nPress R to reload the video capture setup, useful if you want to switch the captured display / window\nPress F to reload the FOV value at %s, which is useful for testing your adjustments live\nPress C to calibrate where the centre of your vision should be\n", fovfilepath.c_str());
+	printf("==============\n");
 
 	while (!WindowShouldClose()) 
 	{
@@ -158,11 +177,12 @@ int main(int argc, char** argv)
 		yawString = imustring.substr(0, imustring.find(","));
 		float yaw = strtof(yawString.c_str(), NULL);
 
-		// Apply roll pitch and yaw turned into radians. These ADD the rotation to the camera, rather
-		// than APPLYING them, meaning we must reverse these rotations at the end of the loop
-		CameraRoll(&camera, roll * DEG2RAD);
-		CameraPitch(&camera, (pitch * DEG2RAD), false, false, false);
-		CameraYaw(&camera, -yaw * DEG2RAD, false);
+		// Apply roll pitch and yaw turned into radians, minus the calibration values also as radians. These ADD the rotation to the camera, rather
+		// than APPLYING them, meaning we must reverse these rotations at the end of the loop.
+		// Yaw (and therefore calYaw) must be made negative
+		CameraRoll(&camera, ((roll * DEG2RAD) - (calRoll * DEG2RAD)));
+		CameraPitch(&camera, ((pitch * DEG2RAD) - (calPitch * DEG2RAD)), false, false, false);
+		CameraYaw(&camera, ((-yaw * DEG2RAD) - (-calYaw * DEG2RAD)), false);
 
 		BeginDrawing();
 
@@ -170,22 +190,22 @@ int main(int argc, char** argv)
 
 				ClearBackground(BLACK);
 				
-				DrawPlaneTexture(texture, (Vector3){0.0f, 0.0f, 4.0f}, -5.33333f, -3.0f, 0.0f);
+				DrawPlaneTexture(texture, (Vector3){0.0f, 0.0f, 8.0f}, -5.33333f, -3.0f, 0.0f);
 
 			EndMode3D();
 		EndDrawing();
 
 		// Removing previously applied rotation
-		CameraYaw(&camera, yaw * DEG2RAD, false);
-		CameraPitch(&camera, -pitch * DEG2RAD, false, false, false);
-		CameraRoll(&camera, -roll * DEG2RAD);
+		CameraYaw(&camera, -((-yaw * DEG2RAD) - (-calYaw * DEG2RAD)), false);
+		CameraPitch(&camera, -((pitch * DEG2RAD) - (calPitch * DEG2RAD)), false, false, false);
+		CameraRoll(&camera, -((roll * DEG2RAD) - (calRoll * DEG2RAD)));
 
 
 		// Reload the video capture thread
-		if(IsKeyDown(KEY_Q)) {
-			printf("Exiting Video Capture Thread...");
+		if(IsKeyPressed(KEY_R)) {
+			printf("Exiting Video Capture Thread...\n");
 			thread_running = false;
-			printf("Starting Video Capture Thread...");
+			printf("Started screencap thread, waiting for confirmation...\n");
 		  pthread_create(&ptid, NULL, videoCapThread, NULL);
 			while (!cap_thread_ready) usleep(200000);
 
@@ -201,16 +221,26 @@ int main(int argc, char** argv)
 		}
 
 		// Reload FOV value
-		if(IsKeyDown(KEY_C)) {
-			std::string vfovstring;
-			std::ifstream vfovfile(fovfilepath);
-			std::getline(vfovfile, vfovstring);
-			float vfov = strtof(vfovstring.c_str(), NULL);
-			printf("Vertical FOV set to %f", vfov);
-			camera.fovy = vfov;
+		if(IsKeyPressed(KEY_F)) {
+			if (access(fovfilepath.c_str(), F_OK) == 0) {
+				std::string vfovstring;
+				std::ifstream vfovfile(fovfilepath);
+				std::getline(vfovfile, vfovstring);
+				float vfov = strtof(vfovstring.c_str(), NULL);
+				printf("Vertical FOV reloaded, set to %f\n", vfov);
+				camera.fovy = vfov;
+			} else printf("Couldn't reload the vertical FOV file, as it doesn't exist\n");
 		}
 
-		printf("FPS: %i\n",GetFPS());
+
+		// Set calibration values
+		if(IsKeyPressed(KEY_C)) {
+			calRoll = roll;
+			calPitch = pitch;
+			calYaw = yaw;
+			printf("Set calibration values to %f, %f, %f\n", calRoll, calPitch, calYaw);
+		}
+
 	}
 
     UnloadTexture(texture);
