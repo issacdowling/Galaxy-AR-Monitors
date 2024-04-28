@@ -1,10 +1,12 @@
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <stdio.h>
 #include <sys/poll.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/signalfd.h>
+#include <sys/stat.h>
 
 #define PixelFormat RaylibPixelFormat
 #include "raylib.h"
@@ -22,8 +24,10 @@
 // danimartin82 for their test2_camera.cpp example (https://github.com/danimartin82/opencv_raylib/tree/master), teaching me how to turn OpenCV frames into textures, though I have replaced OpenCV now
 // Raylib DrawCubeTexture example for helping me make the display (https://www.raylib.com/examples/models/loader.html?name=models_draw_cube_texture)
 
+std::string galaxyshmpath = "/dev/shm/galaxy/";
 std::string imufilepath = "/dev/shm/galaxy/glass_imu";
-std::string fovfilepath = "/dev/shm/galaxy/vfov";
+std::string driverexitpath = "/dev/shm/galaxy/exitGlassesDriver";
+std::string fovfilepath;
 
 Texture2D texture;
 
@@ -95,6 +99,17 @@ void DrawPlaneTexture(Texture2D texture, Vector3 position, float width, float he
 
 int main(int argc, char** argv)
 {
+	// Create /dev/shm/galaxy/
+	mkdir(galaxyshmpath.c_str(), 0755);
+
+	remove(driverexitpath.c_str());
+
+	// Create ~/.config/galaxy/
+	std::string homedir(secure_getenv("HOME"));
+	std::string configdir(homedir + "/.config/galaxy");
+	mkdir(configdir.c_str(), 0755);
+	fovfilepath = configdir + "/vfov";
+
 	//// Window setup
 	int windowWidth = 1920;
 	int windowHeight = 1080;
@@ -239,7 +254,6 @@ int main(int argc, char** argv)
 			} else printf("Couldn't reload the vertical FOV file, as it doesn't exist\n");
 		}
 
-
 		// Set calibration values
 		if(IsKeyPressed(KEY_C)) {
 			calRoll = roll;
@@ -252,6 +266,11 @@ int main(int argc, char** argv)
 
     UnloadTexture(texture);
 		CloseWindow();
+
+		// Create the file that tells the glasses driver to close, as otherwise it would keep running
+ 		FILE *driverCloseFile;
+		driverCloseFile = fopen(driverexitpath.c_str(), "w");
+		fclose(driverCloseFile); 
 
     return 0;
 		exit(0);

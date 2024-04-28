@@ -22,10 +22,11 @@
 // THE SOFTWARE.
 //
 
-#include "device3.h"
-#include "device4.h"
+#include "../interface_lib/include/device3.h"
+#include "../interface_lib/include/device4.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -60,7 +61,8 @@ void test3(uint64_t timestamp,
 
 	FILE *imudatafile_pointer;
 
-	
+	// This file will be made by the main program when it's time to exit
+	if(access("/dev/shm/galaxy/exitGlassesDriver", F_OK) == 0) exit(0); remove("/dev/shm/galaxy/exitGlassesDriver");
 
 
 	if (d >= 0.00005f) {
