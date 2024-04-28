@@ -4,4 +4,4 @@ SELF=$(readlink -f "$0")
 HERE=${SELF%/*}
 EXEC="${HERE}/usr/bin/galaxy"
 export LD_LIBRARY_PATH="${HERE}/usr/lib/"
-exec "${EXEC} $0"
+exec "${EXEC}"
