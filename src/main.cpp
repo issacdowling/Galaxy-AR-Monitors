@@ -48,6 +48,13 @@ void* videoCapThread(void *id){
 	auto pwStream = pw::PipeWireStream(shareInfo.value(), false);
 
 	while (thread_running) {
+		// This pollfd stuff must be kept, as it seems to limit things from using 100% of the CPU
+		struct pollfd fds[2];
+		fds[0] = {pwStream.getEventPollFd(), POLLIN, 0};
+		int res = poll(fds, 2, -1);
+		if (!(fds[0].revents & POLLIN))
+			continue;
+		
 		auto ev = pwStream.nextEvent();
 		if (ev) {
 			// call lambda function appropriate for the type of *ev
