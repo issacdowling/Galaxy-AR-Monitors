@@ -18,11 +18,25 @@ cd $REPOROOTDIR
 # Call the regular build script
 echo "Running the regular build script."
 echo ""
-exec packaging/rawbuild.sh
+
+./packaging/rawbuild.sh
 
 ## Begin making AppImage
 echo "CD'ing back into $REPOROOTDIR"
 cd $REPOROOTDIR
+
+DIR=packaging/galaxy.AppDir/
+if test -d "$DIR"; then
+  read -p "The AppImage packaging dir ($DIR) already exists. To continue, I'd like to remove it. Can I? [Y/n] " yn
+  case $yn in
+    [yY] ) rm -rf $DIR; break;;
+    [nN] ) echo "Exiting due to user cancellation"; exit;;
+    * ) rm -rf $DIR; break;;
+  esac
+
+else
+  echo "$DIR dir doesn't exist, making it."
+fi
 
 ## Copy over the executables
 mkdir -p packaging/galaxy.AppDir/usr/bin/
