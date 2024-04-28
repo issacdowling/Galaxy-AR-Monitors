@@ -54,7 +54,7 @@ void* videoCapThread(void *id){
 		int res = poll(fds, 2, -1);
 		if (!(fds[0].revents & POLLIN))
 			continue;
-		
+
 		auto ev = pwStream.nextEvent();
 		if (ev) {
 			// call lambda function appropriate for the type of *ev
@@ -77,8 +77,8 @@ void* videoCapThread(void *id){
 						// assumes 3 channels, and I need 4 to take BGRA in. CV_8UC4 therefore works.
 						if (screencapHeight != e.frame->height || screencapWidth != e.frame->width) screencapHeight = e.frame->height; screencapWidth = e.frame->width;
 
-						cv::cvtColor(cv::Mat(screencapHeight, screencapWidth, CV_8UC4, (void*) (e.frame->memory)), screencapMat, cv::COLOR_RGBA2BGR);
-
+						cv::cvtColor(cv::Mat(screencapHeight, screencapWidth, CV_8UC4, (void*) (e.frame->memory)), screencapMat, cv::COLOR_RGBA2BGRA);
+						
 						cap_thread_ready = true;
 
 					},
@@ -127,7 +127,7 @@ int main(int argc, char** argv)
 	Image initial_display_texture;
 	initial_display_texture.width = screencapWidth;
 	initial_display_texture.height = screencapHeight;
-	initial_display_texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8;
+	initial_display_texture.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
 	initial_display_texture.mipmaps= 1 ;
 	initial_display_texture.data = (void*) (screencapMat.data);
 	texture = LoadTextureFromImage(initial_display_texture);
