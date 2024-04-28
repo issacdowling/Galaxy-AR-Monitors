@@ -24,15 +24,24 @@ exec packaging/rawbuild.sh
 echo "CD'ing back into $REPOROOTDIR"
 cd $REPOROOTDIR
 
-## Copy over the executable
-mkdir -p packaging/galaxy.AppDir/usr/bin
-mv src/build/galaxy packaging/galaxy.AppDir/usr/bin
+## Copy over the executables
+mkdir -p packaging/galaxy.AppDir/usr/bin/
+mv src/build/galaxy packaging/galaxy.AppDir/usr/bin/
+mv src/build/xrealAirLinuxDriver packaging/galaxy.AppDir/usr/bin/
 
 ## Copy over the required Raylib, OpenCV imgproc, and OpenCV core libs
 mkdir -p packaging/galaxy.AppDir/usr/lib
 cp /usr/lib/libopencv_imgproc.so* packaging/galaxy.AppDir/usr/lib/
 cp /usr/lib/libopencv_core.so* packaging/galaxy.AppDir/usr/lib/
 cp /usr/lib/libraylib.so* packaging/galaxy.AppDir/usr/lib/
+
+cp /usr/lib/liblapack.so* packaging/galaxy.AppDir/usr/lib
+cp /usr/lib/libcblas.so* packaging/galaxy.AppDir/usr/lib
+cp /usr/lib/libblas.so* packaging/galaxy.AppDir/usr/lib
+
+cp /usr/lib/libtbb.so* packaging/galaxy.AppDir/usr/lib
+
+cp /usr/lib/libgfortran.so* packaging/galaxy.AppDir/usr/lib
 
 ## This removes the plain .so files, and the .so.x.y.z files, leaving the .so.xyz files there,
 ## which is done to save space, as these are the only ones the program checks for.
@@ -45,4 +54,4 @@ cp packaging/galaxy.desktop packaging/galaxy.AppDir/galaxy.desktop
 cp packaging/galaxy.png packaging/galaxy.AppDir/galaxy.png
 
 ## Build the appimage
-appimagetool packaging/galaxy.AppDir/appimagetool packaging/galaxy.AppDir/
+appimagetool packaging/galaxy.AppDir

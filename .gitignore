@@ -3,4 +3,6 @@ build
 galaxy.AppDir
 *.AppImage
 
+trace.txt
+
 .vscode
