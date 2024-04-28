@@ -67,5 +67,8 @@ cp packaging/AppRun packaging/galaxy.AppDir/AppRun
 cp packaging/galaxy.desktop packaging/galaxy.AppDir/galaxy.desktop
 cp packaging/galaxy.png packaging/galaxy.AppDir/galaxy.png
 
+## Remove previously-existing AppImage
+rm Galaxy*.AppImage
+
 ## Build the appimage
 appimagetool packaging/galaxy.AppDir

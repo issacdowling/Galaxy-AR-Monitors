@@ -38,5 +38,5 @@ cmake ..
 make
 
 echo "====================="
-echo "Successfully built. Your executable can be found in build/galaxy"
+echo "Successfully built. Your executables can be found in build/galaxy and build/xrealAirLinuxDriver"
 echo "====================="
