@@ -70,7 +70,7 @@ void test3(uint64_t timestamp,
 		imudatafile_pointer = fopen("/dev/shm/galaxy/tmpglass_imu", "w");
 		fprintf(imudatafile_pointer, "%f,%f,%f", e0.roll, e0.pitch, e0.yaw);
 		fclose(imudatafile_pointer); 
-		printf("Roll: %f; Pitch: %f; Yaw: %f\n", e0.roll, e0.pitch, e0.yaw);
+		// printf("Roll: %f; Pitch: %f; Yaw: %f\n", e0.roll, e0.pitch, e0.yaw);
 		rename("/dev/shm/galaxy/tmpglass_imu", "/dev/shm/galaxy/glass_imu");
 		// printf("Roll: %f; Pitch: %f; Yaw: %f\n", e.roll, e.pitch, e.yaw);
 	} else {
@@ -79,7 +79,7 @@ void test3(uint64_t timestamp,
 		imudatafile_pointer = fopen("/dev/shm/galaxy/tmpglass_imu", "w");
 		fprintf(imudatafile_pointer, "%f,%f,%f", e.roll, e.pitch, e.yaw);
 		fclose(imudatafile_pointer); 
-		printf("Roll: %.2f; Pitch: %.2f; Yaw: %.2f\n", e.roll, e.pitch, e.yaw);
+		// printf("Roll: %.2f; Pitch: %.2f; Yaw: %.2f\n", e.roll, e.pitch, e.yaw);
 		rename("/dev/shm/galaxy/tmpglass_imu", "/dev/shm/galaxy/glass_imu");
 	}
 	
