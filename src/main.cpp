@@ -273,6 +273,18 @@ int main(int argc, char** argv)
 			printf("Set calibration values to %f, %f, %f\n", calRoll, calPitch, calYaw);
 		}
 
+		// Toggle Fullscreen
+		if(IsKeyPressed(KEY_T)) {
+			ToggleFullscreen();
+			printf("Toggled fullscreen\n");
+		}
+
+		// Toggle Borderless
+		if(IsKeyPressed(KEY_B)) {
+			ToggleBorderlessWindowed();
+			printf("Toggled borderless mode\n");
+		}
+
 	}
 
     UnloadTexture(texture);
