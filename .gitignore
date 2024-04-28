@@ -3,6 +3,8 @@ build
 galaxy.AppDir
 *.AppImage
 
+xdg-desktop-portal-hyprland
+
 trace.txt
 
 .vscode
