@@ -176,7 +176,7 @@ int main(int argc, char** argv)
 	float calYaw = 0.0;
 
 	printf("==============\n");
-	printf("Galaxy AR Monitors has started.\nPress R to reload the video capture setup, useful if you want to switch the captured display / window\nPress F to reload the FOV value at %s, which is useful for testing your adjustments live\nPress C to calibrate where the centre of your vision should be\n", fovfilepath.c_str());
+	printf("Galaxy AR Monitors has started.\nPress R to reload the video capture setup, useful if you want to switch the captured display / window\nPress F to reload the FOV value at %s, which is useful for testing your adjustments live\nPress C to calibrate where the centre of your vision should be.\nIf your screen just appears to be black after selecting a source, try pressing C to see if you're just looking away from the display.", fovfilepath.c_str());
 	printf("==============\n");
 
 	while (!WindowShouldClose()) 
