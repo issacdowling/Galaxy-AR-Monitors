@@ -20,3 +20,22 @@ set(EXPORT_CPP_INTERFACE ON)
 add_subdirectory(include/libscreencapture-wayland)
 
 target_link_libraries(galaxy PRIVATE screencapture-wayland)
+
+## Build Xreal Air Linux Driver too
+
+project(xrealAirLinuxDriver C)
+
+set(CMAKE_C_STANDARD 17)
+
+add_subdirectory(include/xrealAirLinuxDriver/interface_lib)
+# add_subdirectory(examples)
+
+add_executable(xrealAirLinuxDriver	include/xrealAirLinuxDriver/src/driver.c)
+
+target_include_directories(xrealAirLinuxDriver
+		BEFORE PUBLIC include/xrealAirLinuxDriver/interface_lib/include
+)
+
+target_link_libraries(xrealAirLinuxDriver
+		xrealAirLibrary
+)
