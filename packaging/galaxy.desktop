@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Galaxy AR Monitors
+Exec=galaxy
+Icon=galaxy
+Type=Application
+Comment=An AR display program, similar to Xreal/Nreal's Nebula, allowing freezing a monitor in 3DoF space.
+Categories=Utility;
