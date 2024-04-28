@@ -34,6 +34,7 @@ Texture2D texture;
 cv::Mat screencapMat;
 int screencapHeight = 0;
 int screencapWidth = 0;
+bool swapRB = false;
 
 bool cap_thread_ready = false;
 
@@ -79,9 +80,13 @@ void* videoCapThread(void *id){
 						// and it seems to have been a combination of not remembering to add an Alpha channel at the start of the conversion type,
 						// and - the main reason - not understanding the Mat types. CV_8U is not enough, as it specifies 8 bit per channel, but
 						// assumes 3 channels, and I need 4 to take BGRA in. CV_8UC4 therefore works.
-						if (screencapHeight != e.frame->height || screencapWidth != e.frame->width) screencapHeight = e.frame->height; screencapWidth = e.frame->width;
+						if (screencapHeight != e.frame->height || screencapWidth != e.frame->width) {
+							screencapHeight = e.frame->height;
+							screencapWidth = e.frame->width;
+						}
 
-						cv::cvtColor(cv::Mat(screencapHeight, screencapWidth, CV_8UC4, (void*) (e.frame->memory)), screencapMat, cv::COLOR_RGBA2BGRA);
+						if (swapRB) cv::cvtColor(cv::Mat(screencapHeight, screencapWidth, CV_8UC4, (void*) (e.frame->memory)), screencapMat, cv::COLOR_RGBA2BGRA);
+						else screencapMat = cv::Mat(screencapHeight, screencapWidth, CV_8UC4, (void*) (e.frame->memory));
 						
 						cap_thread_ready = true;
 
@@ -126,6 +131,12 @@ int main(int argc, char** argv)
 	camera.fovy = 22.5f;
 	camera.projection = CAMERA_PERSPECTIVE;
 
+	// Get whether the R and B channnels need to be swapped
+	std::string rbswapconfigstring = configdir + "/rbswap";
+	if (access(rbswapconfigstring.c_str(), F_OK) == 0) {
+		swapRB = true;
+		printf("SwapRB file found (%s), swapping R and B channels of screencap\n", rbswapconfigstring.c_str());
+	} else printf("SwapRGB file (%s) not found, so not swapping the R and B channels.\nIf your image has the R and B channels swapped, create this file so Galaxy can correct it.\n", rbswapconfigstring.c_str());
 
 	//// Screencap setup (!!MUST!! COME AFTER THE InitWindow, or texure loading will segfault)
 	screencapture_wayland_init(&argc, &argv);
